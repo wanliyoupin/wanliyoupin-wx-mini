@@ -19,16 +19,9 @@
         </view>
       </view>
 
-      <view class="category-filter">
+      <view v-if="categories.length > 0" class="category-filter">
         <scroll-view scroll-x class="category-scroll" :show-scrollbar="false">
           <view class="category-list">
-            <view
-              class="category-item"
-              :class="{ active: selectedCategoryId === null }"
-              @click="selectCategory(null)"
-            >
-              <text>全部</text>
-            </view>
             <view
               v-for="category in categories"
               :key="category.id"
@@ -170,6 +163,7 @@ const loadCategories = async (useCache = true) => {
     cache.categories.length > 0
   ) {
     categories.value = cache.categories;
+    applyDefaultFirstCategory();
     return;
   }
 
@@ -178,6 +172,7 @@ const loadCategories = async (useCache = true) => {
     const result = await getCategoryTree(companyId, 'package');
     if (result.code === 0 && result.data) {
       categories.value = result.data;
+      applyDefaultFirstCategory();
     }
   } catch (error: any) {
     console.error('加载分类失败:', error);
@@ -186,7 +181,20 @@ const loadCategories = async (useCache = true) => {
   }
 };
 
-const selectCategory = (categoryId: number | null) => {
+/** 无选中或选中已失效时，默认第一个分类 */
+const applyDefaultFirstCategory = () => {
+  const list = categories.value;
+  if (list.length === 0) {
+    selectedCategoryId.value = null;
+    return;
+  }
+  const ids = list.map((c: { id: number }) => c.id);
+  if (selectedCategoryId.value == null || !ids.includes(selectedCategoryId.value)) {
+    selectedCategoryId.value = list[0].id;
+  }
+};
+
+const selectCategory = (categoryId: number) => {
   selectedCategoryId.value = categoryId;
   loadPackages(true, false);
 };
@@ -296,6 +304,7 @@ onShow(async () => {
   lastHydratedCompanyIdForList.value = cid;
 
   await loadCategories(true);
+  applyDefaultFirstCategory();
   await loadPackages(true, true);
 });
 

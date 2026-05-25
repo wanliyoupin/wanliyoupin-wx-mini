@@ -780,10 +780,10 @@ onShareTimeline(() => {
   white-space: normal;
 }
 
-/* 与 .section-title（商品介绍）同色 #0d9488 */
+/* 字号、字重与 .section-title（商品介绍）一致 */
 .product-tag-inline {
-  font-size: 38rpx;
-  font-weight: 600;
+  font-size: 32rpx;
+  font-weight: bold;
   color: #0d9488;
   background: #f0fdfa;
   padding: 4rpx 16rpx;
