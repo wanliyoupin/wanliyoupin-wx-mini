@@ -123,6 +123,12 @@
         </view>
         <text class="action-label">地址管理</text>
       </view>
+      <view v-if="canAccessLeads" class="action-item" @click="goToLeadManagement">
+        <view class="action-icon-wrapper lead">
+          <text class="action-icon-emoji">📋</text>
+        </view>
+        <text class="action-label">线索管理</text>
+      </view>
       <view v-if="user_token" class="action-item" @click="goToSwitchCompany">
         <view class="action-icon-wrapper company-switch">
           <text class="action-icon-emoji">🏢</text>
@@ -325,6 +331,7 @@ const companyPublicInfo = ref<CompanyPublicInfo | null>(null);
 const showAboutModal = ref(false);
 const isAdmin = ref(false);
 const isCompanyAdminUser = ref(false);
+const canAccessLeads = ref(false);
 
 const isMember = computed(() => isRegisteredMember(userInfo.value?.role));
 
@@ -352,6 +359,7 @@ const permissionsCache = ref<{
   isAdmin: boolean;
   isCompanyUser: boolean;
   isCompanyAdminUser: boolean;
+  canAccessLeads: boolean;
   ts: number;
 } | null>(null);
 
@@ -379,6 +387,7 @@ const checkUserPermissions = async () => {
     isCompanyUser.value = false;
     isAdmin.value = false;
     isCompanyAdminUser.value = false;
+    canAccessLeads.value = false;
     permissionsCache.value = null;
     return;
   }
@@ -397,20 +406,24 @@ const checkUserPermissions = async () => {
     isAdmin.value = cache.isAdmin;
     isCompanyUser.value = cache.isCompanyUser;
     isCompanyAdminUser.value = cache.isCompanyAdminUser;
+    canAccessLeads.value = cache.canAccessLeads;
     return;
   }
 
   isAdmin.value = userInfo.value?.role === "admin";
 
+  let leadAccess = isAdmin.value;
   if (currentCompanyId != null) {
     const role = await getCompanyUserRoleCached(currentCompanyId, true);
     /** 是否存在 company_users 行；无行时 getCompanyUserRoleCached 仍可能返回公司 default_* 策略，不能用来判断成员身份 */
     isCompanyUser.value = await queryHasCompanyMembershipRow(currentCompanyId);
     isCompanyAdminUser.value = (role?.isAdmin ?? false) && isCompanyUser.value;
+    leadAccess = leadAccess || (!!role?.canAccessLeads && isCompanyUser.value);
   } else {
     isCompanyUser.value = false;
     isCompanyAdminUser.value = false;
   }
+  canAccessLeads.value = leadAccess;
 
   permissionsCache.value = {
     userId: Number(userId),
@@ -418,6 +431,7 @@ const checkUserPermissions = async () => {
     isAdmin: isAdmin.value,
     isCompanyUser: isCompanyUser.value,
     isCompanyAdminUser: isCompanyAdminUser.value,
+    canAccessLeads: canAccessLeads.value,
     ts: Date.now(),
   };
 };
@@ -502,6 +516,22 @@ const goToContact = () => {
   }
   uni.navigateTo({
     url: `/pages/contact/index?companyId=${companyId}`,
+  });
+};
+
+// 跳转到线索管理（公司管理员 / admin_lead / track_lead）
+const goToLeadManagement = () => {
+  if (!needUserId()) return;
+  if (!companyInfo.value?.id) {
+    uni.showToast({ title: "请先选择公司", icon: "none" });
+    return;
+  }
+  if (!canAccessLeads.value) {
+    uni.showToast({ title: "无权限访问线索管理", icon: "none" });
+    return;
+  }
+  uni.navigateTo({
+    url: "/subPackages/company/lead-list/index",
   });
 };
 
@@ -626,6 +656,7 @@ const handleLogout = () => {
         isCompanyUser.value = false;
         isAdmin.value = false;
         isCompanyAdminUser.value = false;
+        canAccessLeads.value = false;
 
         try {
           await ensureWxSilentAuth();
@@ -1001,6 +1032,10 @@ onShow(async () => {
 
 .action-icon-wrapper.company-switch {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.action-icon-wrapper.lead {
+  background: linear-gradient(135deg, #34d399 0%, #0d9488 100%);
 }
 
 .action-icon-emoji {

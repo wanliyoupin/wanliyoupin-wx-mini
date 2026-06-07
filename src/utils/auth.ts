@@ -14,6 +14,14 @@ export interface CompanyUserRoleResult {
   isAdmin: boolean;
   canViewPrice: boolean;
   priceFactor: number;
+  /** company_users.id，业务接口写入跟进人时使用 */
+  companyUserId?: number;
+  /** admin_lead 等，& 分隔 */
+  permissions?: string | null;
+  /** 公司管理员或 admin_lead */
+  isLeadAdmin?: boolean;
+  /** 可进入线索模块（公司管理员 / admin_lead） */
+  canAccessLeads?: boolean;
   /** 仅当无 companyId 且用户为某公司管理员时存在 */
   managedCompany?: ManagedCompanyInfo;
 }
@@ -27,6 +35,9 @@ let roleCache: { userId: number; companyKey: number; entry: RoleCacheEntry } | n
 
 /** company_users 行 + 嵌套公司策略（与 companies 表 mode_for_price / default_* 一致） */
 type CompanyUserPolicyRow = {
+  id?: number;
+  role?: string;
+  permissions?: string | null;
   can_view_price: boolean;
   price_factor: number | string;
   company?: {
@@ -35,6 +46,23 @@ type CompanyUserPolicyRow = {
     default_for_can_view_price?: boolean | null;
   } | null;
 };
+
+function parseLeadPermKeys(permissions: string | null | undefined): Set<string> {
+  if (permissions == null || !String(permissions).trim()) return new Set();
+  return new Set(
+    String(permissions)
+      .split('&')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+}
+
+function buildLeadFlags(row: { role?: string; permissions?: string | null }) {
+  const permKeys = parseLeadPermKeys(row.permissions);
+  const isLeadAdmin = row.role === 'admin' || permKeys.has('admin_lead');
+  const canAccessLeads = isLeadAdmin;
+  return { isLeadAdmin, hasTrackLead: false, canAccessLeads };
+}
 
 /**
  * mode=company 时用公司 default_for_price_factor；否则用 company_users.price_factor。
@@ -110,6 +138,9 @@ async function fetchCompanyPriceWhenNoMembership(
       isAdmin: false,
       canViewPrice: Boolean(c.default_for_can_view_price),
       priceFactor: pf > 0 ? pf : 1,
+      canAccessLeads: false,
+      isLeadAdmin: false,
+      hasTrackLead: false,
     };
   } catch (e) {
     console.error('fetchCompanyPriceWhenNoMembership', e);
@@ -267,6 +298,7 @@ export async function getCompanyUserRole(companyId?: number): Promise<CompanyUse
           ) {
             id
             role
+            permissions
             can_view_price
             price_factor
             company {
@@ -284,10 +316,14 @@ export async function getCompanyUserRole(companyId?: number): Promise<CompanyUse
       if (!result?.company_users || result.company_users.length === 0) return null;
       const row = result.company_users[0];
       const company = row.company;
+      const leadFlags = buildLeadFlags(row);
       return {
         isAdmin: row.role === 'admin',
         canViewPrice: resolveEffectiveCanViewPrice(row, userInfo.value?.role ?? null),
         priceFactor: resolveEffectivePriceFactor(row),
+        companyUserId: row.id != null ? Number(row.id) : undefined,
+        permissions: row.permissions ?? null,
+        ...leadFlags,
         managedCompany: company
           ? { id: company.id, name: company.name, logo_url: company.logo_url ?? null }
           : undefined,
@@ -311,6 +347,7 @@ export async function getCompanyUserRole(companyId?: number): Promise<CompanyUse
         ) {
           id
           role
+          permissions
           can_view_price
           price_factor
           company {
@@ -331,10 +368,14 @@ export async function getCompanyUserRole(companyId?: number): Promise<CompanyUse
     }
 
     const companyUser = result.company_users[0];
+    const leadFlags = buildLeadFlags(companyUser);
     return {
       isAdmin: companyUser.role === 'admin',
       canViewPrice: resolveEffectiveCanViewPrice(companyUser, userInfo.value?.role ?? null),
       priceFactor: resolveEffectivePriceFactor(companyUser),
+      companyUserId: companyUser.id != null ? Number(companyUser.id) : undefined,
+      permissions: companyUser.permissions ?? null,
+      ...leadFlags,
     };
   } catch (error) {
     console.error('获取公司用户角色失败:', error);

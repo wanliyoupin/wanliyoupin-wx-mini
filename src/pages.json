@@ -319,6 +319,34 @@
 						"navigationBarTextStyle": "black",
 						"enablePullDownRefresh": true
 					}
+				},
+				{
+					"path": "lead-list/index",
+					"style": {
+						"navigationBarTitleText": "线索管理",
+						"navigationBarBackgroundColor": "#ffffff",
+						"navigationBarTextStyle": "black",
+						"navigationStyle": "custom",
+						"disableScroll": true
+					}
+				},
+				{
+					"path": "lead-detail/index",
+					"style": {
+						"navigationBarTitleText": "线索详情",
+						"navigationBarBackgroundColor": "#ffffff",
+						"navigationBarTextStyle": "black",
+						"navigationStyle": "custom"
+					}
+				},
+				{
+					"path": "lead-form/index",
+					"style": {
+						"navigationBarTitleText": "线索资料",
+						"navigationBarBackgroundColor": "#ffffff",
+						"navigationBarTextStyle": "black",
+						"navigationStyle": "custom"
+					}
 				}
 			]
 		}
