@@ -60,22 +60,37 @@ export class BannerDataHelper {
    * 支持字符串格式（兼容旧数据）和 BannerItem 对象格式
    */
   static getImageUrl(banner: BannerData | null | undefined): string {
+    return BannerDataHelper.getMediaUrl(banner);
+  }
+
+  /** 轮播媒体 URL（图片或视频） */
+  static getMediaUrl(banner: BannerData | null | undefined): string {
     if (!banner) {
       return "/static/default-banner.png";
     }
 
-    // 如果是字符串，直接返回（兼容旧数据格式）
     if (typeof banner === "string") {
       return banner;
     }
 
-    // 如果是对象，使用 file_url 字段
     if (typeof banner === "object" && banner.file_url) {
       return banner.file_url;
     }
 
-    // 默认返回占位图
     return "/static/default-banner.png";
+  }
+
+  /** 是否为视频轮播项 */
+  static isVideo(banner: BannerData | null | undefined): boolean {
+    if (!banner || typeof banner === "string") return false;
+    const ft = (banner.file_type ?? "").toLowerCase();
+    if (ft === "video" || ft.startsWith("video/")) return true;
+    const url = (banner.file_url ?? "").toLowerCase();
+    return /\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i.test(url);
+  }
+
+  static inferFileType(banner: BannerData): "image" | "video" {
+    return BannerDataHelper.isVideo(banner) ? "video" : "image";
   }
 
   /**
@@ -110,8 +125,10 @@ export class BannerDataHelper {
     }
 
     if (typeof banner === "object") {
-      // 已经是 BannerItem 格式，直接返回
-      return banner;
+      return {
+        ...banner,
+        file_type: banner.file_type ?? (BannerDataHelper.isVideo(banner) ? "video" : "image"),
+      };
     }
 
     return {

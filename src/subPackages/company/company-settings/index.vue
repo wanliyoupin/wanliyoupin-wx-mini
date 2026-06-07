@@ -38,11 +38,24 @@
               :key="index" 
               class="banner-item"
             >
+              <video
+                v-if="isBannerVideo(banner)"
+                :src="getBannerMediaUrl(banner)"
+                class="banner-image banner-video"
+                object-fit="cover"
+                :controls="false"
+                :show-center-play-btn="true"
+                :autoplay="false"
+                muted
+                preload="metadata"
+              />
               <image 
+                v-else
                 :src="getBannerImage(banner)" 
                 class="banner-image"
                 mode="aspectFill"
               />
+              <view v-if="isBannerVideo(banner)" class="banner-type-tag">视频</view>
               <view class="banner-actions">
                 <text class="banner-action-btn" @click="editTopBanner(index)">编辑</text>
                 <text class="banner-action-btn delete" @click="removeTopBanner(index)">删除</text>
@@ -50,7 +63,7 @@
             </view>
             <view class="add-banner-btn" @click="addTopBanner">
               <text class="add-icon">+</text>
-              <text class="add-text">添加轮播图</text>
+              <text class="add-text">添加轮播图/视频</text>
             </view>
           </view>
         </view>
@@ -63,11 +76,24 @@
               :key="index" 
               class="banner-item"
             >
+              <video
+                v-if="isBannerVideo(banner)"
+                :src="getBannerMediaUrl(banner)"
+                class="banner-image banner-video"
+                object-fit="cover"
+                :controls="false"
+                :show-center-play-btn="true"
+                :autoplay="false"
+                muted
+                preload="metadata"
+              />
               <image 
+                v-else
                 :src="getBannerImage(banner)" 
                 class="banner-image"
                 mode="aspectFill"
               />
+              <view v-if="isBannerVideo(banner)" class="banner-type-tag">视频</view>
               <view v-if="!isAuditMode" class="banner-actions">
                 <text class="banner-action-btn" @click="editBottomBanner(index)">编辑</text>
                 <text class="banner-action-btn delete" @click="removeBottomBanner(index)">删除</text>
@@ -75,7 +101,7 @@
             </view>
             <view v-if="!isAuditMode" class="add-banner-btn" @click="addBottomBanner">
               <text class="add-icon">+</text>
-              <text class="add-text">添加轮播图</text>
+              <text class="add-text">添加轮播图/视频</text>
             </view>
           </view>
         </view>
@@ -196,17 +222,27 @@
         </view>
         <view class="modal-body">
           <view class="form-item">
-            <view class="form-label">轮播图</view>
-            <view class="form-upload banner" @click="uploadBannerImage">
+            <view class="form-label">轮播图 / 视频</view>
+            <view class="form-upload banner" @click="uploadBannerMedia">
+              <video
+                v-if="editingBanner.file_url && isBannerVideo(editingBanner)"
+                :src="editingBanner.file_url"
+                class="uploaded-image banner-video"
+                object-fit="contain"
+                :controls="true"
+                :show-center-play-btn="true"
+                :autoplay="false"
+                @tap.stop
+              />
               <image 
-                v-if="editingBanner.file_url" 
+                v-else-if="editingBanner.file_url" 
                 :src="editingBanner.file_url" 
                 class="uploaded-image"
                 mode="aspectFill"
               />
               <view v-else class="upload-placeholder">
                 <text class="upload-icon">📷</text>
-                <text class="upload-text">点击上传图片</text>
+                <text class="upload-text">点击上传图片或视频</text>
               </view>
             </view>
           </view>
@@ -263,8 +299,9 @@ import { getBanners } from '@/api/banner/index';
 import { useImageUploadWithProgress } from '../utils/useImageUploadWithProgress';
 import UploadProgressOverlay from '@/components/UploadProgressOverlay.vue';
 import type { BannerItem } from '@/types/companies';
+import { BannerDataHelper } from '@/types/companies';
 
-const { uploading, progress, chooseAndUploadImage, uploadWithProgress } = useImageUploadWithProgress();
+const { uploading, progress, chooseAndUploadImage, chooseAndUploadBannerMedia, uploadWithProgress } = useImageUploadWithProgress();
 const companyId = ref<number | null>(null);
 /** 核查入口只读：不可编辑、保存 */
 const isAuditMode = ref(false);
@@ -289,10 +326,14 @@ const editingBannerType = ref<'top' | 'bottom'>('top');
 const editingBannerIndex = ref<number>(-1);
 const editingBanner = ref<BannerItem>({
   file_url: '',
+  file_type: 'image',
   title: '',
   link: '',
   sort: 0,
 });
+
+const isBannerVideo = (banner: BannerItem | string) => BannerDataHelper.isVideo(banner);
+const getBannerMediaUrl = (banner: BannerItem | string) => BannerDataHelper.getMediaUrl(banner);
 
 // 获取轮播图图片URL
 const getBannerImage = (banner: BannerItem | string): string => {
@@ -389,11 +430,12 @@ const onDefaultPriceFactorInput = (e: any) => {
   form.value.default_for_price_factor = s;
 };
 
-// 上传轮播图（带进度）
-const uploadBannerImage = async () => {
+// 上传轮播图/视频（带进度）
+const uploadBannerMedia = async () => {
   try {
-    const url = await chooseAndUploadImage({ ext: '.jpg' });
+    const { url, file_type } = await chooseAndUploadBannerMedia();
     editingBanner.value.file_url = url;
+    editingBanner.value.file_type = file_type;
   } catch (error: any) {
     if (error?.message && !error.message.includes('取消')) {
       uni.showToast({ title: error.message || '上传失败', icon: 'none' });
@@ -407,6 +449,7 @@ const addTopBanner = () => {
   editingBannerIndex.value = -1;
   editingBanner.value = {
     file_url: '',
+    file_type: 'image',
     title: '',
     link: '',
     sort: topBanners.value.length,
@@ -418,7 +461,7 @@ const addTopBanner = () => {
 const editTopBanner = (index: number) => {
   editingBannerType.value = 'top';
   editingBannerIndex.value = index;
-  editingBanner.value = { ...topBanners.value[index] };
+  editingBanner.value = { ...BannerDataHelper.normalizeBanner(topBanners.value[index]) };
   showBannerModal.value = true;
 };
 
@@ -441,6 +484,7 @@ const addBottomBanner = () => {
   editingBannerIndex.value = -1;
   editingBanner.value = {
     file_url: '',
+    file_type: 'image',
     title: '',
     link: '',
     sort: bottomBanners.value.length,
@@ -452,7 +496,7 @@ const addBottomBanner = () => {
 const editBottomBanner = (index: number) => {
   editingBannerType.value = 'bottom';
   editingBannerIndex.value = index;
-  editingBanner.value = { ...bottomBanners.value[index] };
+  editingBanner.value = { ...BannerDataHelper.normalizeBanner(bottomBanners.value[index]) };
   showBannerModal.value = true;
 };
 
@@ -473,14 +517,14 @@ const removeBottomBanner = (index: number) => {
 const saveBanner = () => {
   if (!editingBanner.value.file_url) {
     uni.showToast({
-      title: '请先上传图片',
+      title: '请先上传图片或视频',
       icon: 'none',
     });
     return;
   }
 
   const banner: BannerItem = {
-    file_type: 'image',
+    file_type: editingBanner.value.file_type ?? BannerDataHelper.inferFileType(editingBanner.value),
     file_url: editingBanner.value.file_url,
     title: editingBanner.value.title || undefined,
     link: editingBanner.value.link || undefined,
@@ -509,6 +553,7 @@ const closeBannerModal = () => {
   showBannerModal.value = false;
   editingBanner.value = {
     file_url: '',
+    file_type: 'image',
     title: '',
     link: '',
     sort: 0,
@@ -539,8 +584,7 @@ const loadCompanyDetail = async () => {
 
     // 一次请求加载顶部+底部轮播图
     const bannerRes = await getBanners(companyId.value);
-    const mapBanner = (banner: any) =>
-      typeof banner === 'string' ? { file_url: banner, file_type: 'image', sort: 0 } : banner;
+    const mapBanner = (banner: any) => BannerDataHelper.normalizeBanner(banner);
     if (bannerRes?.code === 0 && bannerRes.data) {
       topBanners.value = bannerRes.data.top.map(mapBanner);
       bottomBanners.value = bannerRes.data.bottom.map(mapBanner);
@@ -814,6 +858,21 @@ onLoad((options?: { id?: string; companyId?: string; audit?: string }) => {
 .banner-image {
   width: 100%;
   height: 300rpx;
+}
+
+.banner-video {
+  background: #000;
+}
+
+.banner-type-tag {
+  position: absolute;
+  top: 12rpx;
+  left: 12rpx;
+  padding: 4rpx 12rpx;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 22rpx;
+  border-radius: 6rpx;
 }
 
 .banner-actions {

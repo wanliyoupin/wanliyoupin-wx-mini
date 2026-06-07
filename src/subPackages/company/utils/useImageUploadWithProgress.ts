@@ -61,10 +61,51 @@ export function useImageUploadWithProgress() {
     }
   }
 
+  /** 轮播图：选择图片或视频并上传 */
+  function chooseAndUploadBannerMedia(): Promise<{ url: string; file_type: 'image' | 'video' }> {
+    return new Promise((resolve, reject) => {
+      uni.chooseMedia({
+        count: 1,
+        mediaType: ['image', 'video'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          const file = res.tempFiles?.[0];
+          if (!file?.tempFilePath) {
+            reject(new Error('未选择文件'));
+            return;
+          }
+          const isVideo = file.fileType === 'video';
+          const ext = isVideo ? '.mp4' : '.jpg';
+          uploading.value = true;
+          progress.value = 0;
+          try {
+            const url = await uploadFile(
+              file.tempFilePath,
+              (p) => {
+                progress.value = p;
+              },
+              ext
+            );
+            resolve({ url, file_type: isVideo ? 'video' : 'image' });
+          } catch (err: any) {
+            reject(err);
+          } finally {
+            uploading.value = false;
+            progress.value = 0;
+          }
+        },
+        fail: (err) => {
+          reject(new Error(err.errMsg || '取消选择'));
+        },
+      });
+    });
+  }
+
   return {
     uploading,
     progress,
     chooseAndUploadImage,
+    chooseAndUploadBannerMedia,
     uploadWithProgress,
   };
 }

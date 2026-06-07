@@ -57,17 +57,32 @@
           duration="500"
           indicator-dots
           indicator-active-color="#007aff"
+          @change="onTopBannerSwiperChange"
         >
           <swiper-item
             v-for="(banner, index) in topBanners"
-            :key="index"
+            :key="'top-' + index"
             @tap="handleBannerClick(banner)"
           >
+            <video
+              v-if="isBannerVideo(banner)"
+              :id="'top-banner-video-' + index"
+              class="banner-image banner-video"
+              :src="getBannerMediaUrl(banner)"
+              object-fit="cover"
+              :controls="true"
+              :show-center-play-btn="true"
+              :autoplay="false"
+              :loop="false"
+              :enable-progress-gesture="true"
+              @tap.stop
+            />
             <image
+              v-else
               class="banner-image"
-              :src="getBannerImage(banner) + '?x-oss-process=image/format,webp'"
+              :src="getBannerDisplaySrc(banner)"
               mode="aspectFill"
-            ></image>
+            />
           </swiper-item>
         </swiper>
       </view>
@@ -123,19 +138,32 @@
               duration="500"
               indicator-dots
               indicator-active-color="#007aff"
+              @change="onBottomBannerSwiperChange"
             >
               <swiper-item
                 v-for="(banner, index) in bottomBanners"
-                :key="index"
+                :key="'bottom-' + index"
                 @tap="handleBannerClick(banner)"
               >
+                <video
+                  v-if="isBannerVideo(banner)"
+                  :id="'bottom-banner-video-' + index"
+                  class="banner-image banner-video"
+                  :src="getBannerMediaUrl(banner)"
+                  object-fit="cover"
+                  :controls="true"
+                  :show-center-play-btn="true"
+                  :autoplay="false"
+                  :loop="false"
+                  :enable-progress-gesture="true"
+                  @tap.stop
+                />
                 <image
+                  v-else
                   class="banner-image"
-                  :src="
-                    getBannerImage(banner) + '?x-oss-process=image/format,webp'
-                  "
+                  :src="getBannerDisplaySrc(banner)"
                   mode="aspectFill"
-                ></image>
+                />
               </swiper-item>
             </swiper>
           </view>
@@ -157,6 +185,7 @@ import { mergeMiniProgramEntryQuery, parsePositiveIntParam } from "@/utils/scene
 import { shouldAllowAutoSwitchCompanyFromEntry } from "@/utils/entryCompanyPolicy";
 import { onShow, onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app";
 import type { BannerArray } from "@/types/companies";
+import { BannerDataHelper } from "@/types/companies";
 
 import PageNavBar from '@/components/PageNavBar.vue';
 import SearchBox from '@/components/SearchBox.vue';
@@ -298,21 +327,35 @@ export default defineComponent({
       return "/static/default.png";
     };
 
-    // 获取轮播图图片
-    const getBannerImage = (banner: any) => {
-      if (!banner) return "/static/default-banner.png";
+    // 获取轮播图图片（兼容旧调用）
+    const getBannerImage = (banner: any) => BannerDataHelper.getMediaUrl(banner);
 
-      // banner 可能是字符串（兼容旧数据），也可能是对象
-      if (typeof banner === "string") {
-        return banner;
+    const isBannerVideo = (banner: any) => BannerDataHelper.isVideo(banner);
+
+    const getBannerMediaUrl = (banner: any) => BannerDataHelper.getMediaUrl(banner);
+
+    const getBannerDisplaySrc = (banner: any) => {
+      const url = getBannerMediaUrl(banner);
+      if (isBannerVideo(banner)) return url;
+      return `${url}?x-oss-process=image/format,webp`;
+    };
+
+    const pauseBannerVideos = (prefix: string, count: number) => {
+      for (let i = 0; i < count; i++) {
+        try {
+          uni.createVideoContext(`${prefix}-${i}`)?.pause();
+        } catch {
+          /* ignore */
+        }
       }
+    };
 
-      // 使用 file_url 字段
-      if (banner.file_url) {
-        return banner.file_url;
-      }
+    const onTopBannerSwiperChange = () => {
+      pauseBannerVideos('top-banner-video', topBanners.value.length);
+    };
 
-      return "/static/default-banner.png";
+    const onBottomBannerSwiperChange = () => {
+      pauseBannerVideos('bottom-banner-video', bottomBanners.value.length);
     };
 
     // 检查是否有轮播图（显式函数，避免构建后丢失）
@@ -460,6 +503,11 @@ export default defineComponent({
       bottomBanners,
       getCategoryImage,
       getBannerImage,
+      isBannerVideo,
+      getBannerMediaUrl,
+      getBannerDisplaySrc,
+      onTopBannerSwiperChange,
+      onBottomBannerSwiperChange,
       handleCategoryClick,
       handleBannerClick,
       hasBanners,
@@ -537,6 +585,10 @@ export default defineComponent({
 .banner-image {
   width: 100%;
   height: 100%;
+}
+
+.banner-video {
+  background: #000;
 }
 
 /* 分类区域 */
